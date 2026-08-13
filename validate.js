@@ -1,6 +1,6 @@
-const Ajv = require("ajv");
-const fs = require("fs");
-const path = require("path");
+import Ajv from "ajv";
+import fs from "fs";
+import path from "path";
 
 const schema = JSON.parse(fs.readFileSync("schemas/video-config.schema.json", "utf8"));
 const ajv = new Ajv({ allErrors: true, verbose: true });
@@ -51,7 +51,8 @@ for (const file of files) {
     // Schema-level fixture: must fail Ajv
     if (!valid) {
       schemaPass++;
-      const firstError = validate.errors[0].instancePath + " " + validate.errors[0].message;
+      const errors = validate.errors || [];
+      const firstError = (errors[0]?.instancePath || '') + " " + (errors[0]?.message || '');
       console.log(`✓ ${file}: FAILED as expected → ${firstError}`);
     } else {
       schemaFail++;
@@ -60,7 +61,8 @@ for (const file of files) {
   } else if (crossFieldFixtures.has(file)) {
     // Cross-field invariant: requires code-level validator (Step 2)
     if (!valid) {
-      console.log(`⚠ ${file}: FAILED schema (unexpected) — expected cross-field pass → ${validate.errors[0].instancePath} ${validate.errors[0].message}`);
+      const errors = validate.errors || [];
+      console.log(`⚠ ${file}: FAILED schema (unexpected) — expected cross-field pass → ${(errors[0]?.instancePath || '')} ${(errors[0]?.message || '')}`);
     } else {
       console.log(`⚠ ${file}: PASSED schema (expected) — requires code-level validator (Step 2)`);
     }
@@ -68,7 +70,8 @@ for (const file of files) {
   } else {
     // Unknown fixture
     if (!valid) {
-      console.log(`? ${file}: FAILED → ${validate.errors[0].instancePath} ${validate.errors[0].message}`);
+      const errors = validate.errors || [];
+      console.log(`? ${file}: FAILED → ${(errors[0]?.instancePath || '')} ${(errors[0]?.message || '')}`);
       schemaPass++;
     } else {
       console.log(`? ${file}: PASSED (not categorized)`);

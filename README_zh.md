@@ -4,6 +4,14 @@
 
 将 JSON 视频配置转换为 [HyperFrames](https://hyperframes.heygen.com) HTML 组合项目，并将其渲染为 MP4 视频。
 
+## 为什么有这个仓库?
+
+1. **AI 时代的接口 (LLM-Friendly)**:
+   让 LLM 直接写出几百行复杂的 Hyperframes HTML + GSAP 动效，幻觉率极高，几乎不可控。但让 LLM 输出一段符合 Schema 的 `video-config.json`（定义好场景、文字、配色、角色）极其简单和稳定。本项目是 AI 自动生成视频 (AIGC Video Pipeline) 的核心组件。
+
+2. **批量化生产 (Automation)**:
+   比如商家要为 10,000 个商品自动生成 10,000 个带商品图和价格的短视频。他们不可能去写 10,000 个 HTML，但可以轻易用数据库数据渲染出 10,000 个 JSON，然后调用本 CLI 批量生成并渲染。
+
 ## CLI 命令行用法
 
 ```bash

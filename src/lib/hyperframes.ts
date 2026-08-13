@@ -5,11 +5,11 @@
 import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { loadConfig } from './generate.mjs';
+import { loadConfig } from './generate.js';
 
 const NPX = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 
-function requireOutputDir() {
+function requireOutputDir(): string {
   const outDir = path.resolve(process.cwd(), 'output');
   if (!fs.existsSync(path.join(outDir, 'index.html'))) {
     console.error('✗ No composition found in output/.');
@@ -20,9 +20,11 @@ function requireOutputDir() {
 }
 
 /** Run `npx hyperframes <args>` in cwd, inheriting stdio. Resolves with the exit code. */
-export function runHyperframes(args, cwd) {
+export function runHyperframes(args: string[], cwd: string): Promise<number> {
   return new Promise((resolve, reject) => {
-    const cmd = ['npx', 'hyperframes', ...args].join(' ');
+    // NOTE: the literal 'hyperframes' package name MUST be the first token after
+    // npx/npx.cmd — it is the package npx looks up, the rest are its args.
+    const cmd = [NPX, 'hyperframes', ...args].join(' ');
     const child = spawn(cmd, {
       cwd,
       stdio: 'inherit',
@@ -33,7 +35,7 @@ export function runHyperframes(args, cwd) {
   });
 }
 
-function readSettings() {
+function readSettings(): any {
   const configPath = path.resolve(process.cwd(), 'video-config.json');
   if (!fs.existsSync(configPath)) return {};
   try {
@@ -49,7 +51,7 @@ export async function runCheck() {
   process.exit(code);
 }
 
-export async function runPreview(forceNew) {
+export async function runPreview(forceNew: boolean) {
   const outDir = requireOutputDir();
   const args = ['preview'];
   if (forceNew) args.push('--force-new');
@@ -57,7 +59,7 @@ export async function runPreview(forceNew) {
   process.exit(code);
 }
 
-export async function runRender(outputName) {
+export async function runRender(outputName?: string) {
   const outDir = requireOutputDir();
   const settings = readSettings();
   const fileName = path.basename(outputName || settings.output || 'out.mp4');

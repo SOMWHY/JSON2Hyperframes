@@ -1,20 +1,17 @@
-/**
- * JSON2Hyperframes — Core generator
- *
- * Reads a video-config.json and produces HyperFrames-compatible HTML.
- * Supports two architectures:
- *   monolithic — a single index.html holding every scene and one timeline
- *   modular    — a thin host index.html plus one file per sub-composition
- */
-
-import j2h from 'node-json2html';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
+import { VideoConfig, J2hfPlugin, PluginContext } from './types.js';
+import { globalRegistry } from './plugin-system.js';
 
-const json2html = j2h.default || j2h;
-// node-json2html v3 uses .render() not .transform()
+// Re-export plugin systems for external developers
+export * from './types.js';
+export * from './plugin-system.js';
+
+// We import node-json2html dynamically/statically. Since it's CJS/ESM mixed:
+import j2h from 'node-json2html';
+const json2html: any = (j2h as any).default || j2h;
 if (!json2html.transform) json2html.transform = json2html.render;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -22,20 +19,28 @@ const PKG_ROOT = path.resolve(__dirname, '..');
 const require = createRequire(import.meta.url);
 
 // ─── Helpers ─────────────────────────────────────────────────────────
-const kebab = (s) => s.replace(/([A-Z])/g, '-$1').toLowerCase().replace(/^-/, '');
+const kebab = (s: string) => s.replace(/([A-Z])/g, '-$1').toLowerCase().replace(/^-/, '');
+
 // Numeric style values that represent lengths need a px unit.
-const LENGTH_PROPS = new Set(['fontSize', 'maxWidth', 'width', 'height', 'top', 'left', 'right', 'bottom', 'gap', 'padding', 'margin', 'lineHeight', 'borderRadius', 'borderWidth']);
-const styleStr = (obj) => obj ? Object.entries(obj).map(([k, v]) => `${kebab(k)}: ${typeof v === 'number' && LENGTH_PROPS.has(k) ? v + 'px' : v}`).join('; ') : '';
-const esc = (s) => String(s).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const LENGTH_PROPS = new Set([
+  'fontSize', 'maxWidth', 'width', 'height', 'top', 'left', 'right', 'bottom',
+  'gap', 'padding', 'margin', 'lineHeight', 'borderRadius', 'borderWidth'
+]);
+
+const styleStr = (obj: any) =>
+  obj ? Object.entries(obj).map(([k, v]) => `${kebab(k)}: ${typeof v === 'number' && LENGTH_PROPS.has(k) ? v + 'px' : v}`).join('; ') : '';
+
+const esc = (s: any) => String(s).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
 // Single quotes inside a single-quoted attribute break the attribute.
-const attrJSON = (json) => json.replace(/'/g, '\\u0027');
+const attrJSON = (json: string) => json.replace(/'/g, '\\u0027');
 
 // ─── Schema validation ───────────────────────────────────────────────
-export function validateConfig(config) {
+export function validateConfig(config: any): string[] {
   const schemaPath = path.join(PKG_ROOT, 'schemas', 'video-config.schema.json');
   if (!fs.existsSync(schemaPath)) return [];
 
-  let Ajv;
+  let Ajv: any;
   try {
     Ajv = require('ajv');
   } catch {
@@ -45,14 +50,14 @@ export function validateConfig(config) {
   const ajv = new (Ajv.default || Ajv)({ allErrors: true, strict: false });
   const validate = ajv.compile(schema);
   if (validate(config)) return [];
-  return validate.errors.map(e => `${e.instancePath || '/'} ${e.message}`);
+  return (validate.errors || []).map((e: any) => `${e.instancePath || '/'} ${e.message}`);
 }
 
 // ─── CSS variables from palette ──────────────────────────────────────
-function buildCSSVars(config) {
+function buildCSSVars(config: VideoConfig): string {
   const p = config.palette;
   if (!p) return '';
-  const lines = [];
+  const lines: string[] = [];
   if (p.background) lines.push(`--background: ${p.background}`);
   if (p.foreground) lines.push(`--foreground: ${p.foreground}`);
   if (p.accent) lines.push(`--accent: ${p.accent}`);
@@ -62,7 +67,7 @@ function buildCSSVars(config) {
 }
 
 // ─── Variable declarations ───────────────────────────────────────────
-function varsJSONFor(config, overrides) {
+function varsJSONFor(config: VideoConfig, overrides?: any): string | null {
   const decls = config.variables && config.variables.declarations;
   if (!decls) return null;
   if (!overrides) return JSON.stringify(decls);
@@ -75,7 +80,7 @@ function varsJSONFor(config, overrides) {
 }
 
 // ─── Root styles ─────────────────────────────────────────────────────
-function buildStyles(config, { scoped } = {}) {
+function buildStyles(config: VideoConfig, { scoped } = { scoped: false }): string {
   const cssVars = buildCSSVars(config);
   const typo = config.typography || {};
   const W = config.width || 1920;
@@ -93,7 +98,7 @@ function buildStyles(config, { scoped } = {}) {
 }
 
 // ─── HTML head ───────────────────────────────────────────────────────
-function buildHead(config, varsJSON) {
+function buildHead(config: VideoConfig, varsJSON: string | null): string {
   const CID = config.compositionId || 'main';
   const W = config.width || 1920;
   const H = config.height || 1080;
@@ -116,14 +121,20 @@ ${buildStyles(config)}
 }
 
 // ─── Background layer ────────────────────────────────────────────────
-function buildBackground(config) {
+function buildBackground(config: VideoConfig): string {
   const bg = config.background;
   if (!bg) return '';
   return `\n<div id="${bg.id}" style="${styleStr(bg.style)}"></div>`;
 }
 
 // ─── Elements ────────────────────────────────────────────────────────
-function renderElement(el, config) {
+function renderElement(el: any, config: VideoConfig): string {
+  // Check plugin renderer first
+  const customRenderer = globalRegistry.getRenderer(el.type);
+  if (customRenderer) {
+    return customRenderer.render(el, config);
+  }
+
   const elId = el.id;
   const s = styleStr(el.style);
   const baseAttrs = `id="${elId}"` + (s ? ` style="${s}"` : '');
@@ -138,7 +149,7 @@ function renderElement(el, config) {
   switch (el.type) {
     case 'text': {
       const typo = el.typography || {};
-      const px = (v) => typeof v === 'number' ? v + 'px' : v;
+      const px = (v: any) => typeof v === 'number' ? v + 'px' : v;
       const fontSize = typo.fontSize ? `font-size: ${px(typo.fontSize)};` : '';
       const color = typo.color ? `color: ${typo.color};` : '';
       const textAlign = typo.textAlign ? `text-align: ${typo.textAlign};` : '';
@@ -151,10 +162,10 @@ function renderElement(el, config) {
       const fontVariant = typo.fontVariantNumeric ? `font-variant-numeric: ${typo.fontVariantNumeric};` : '';
       const extraStyle = [fontSize, color, textAlign, letterSpacing, fontFamily, fontWeight, textTransform, lineHeight, maxWidth, fontVariant].filter(Boolean).join(' ');
       const fullStyle = [s, extraStyle].filter(Boolean).join('; ');
-      // data-var-text fallback: use the variable's declared default when bound
+      
       let textContent = el.content ?? '';
       if (el.varBindings?.varText) {
-        const decl = config.variables?.declarations?.find(d => d.id === el.varBindings.varText);
+        const decl = config.variables?.declarations?.find((d: any) => d.id === el.varBindings.varText);
         textContent = decl?.default !== undefined ? String(decl.default) : textContent;
       }
       return json2html.transform([el], {
@@ -162,7 +173,7 @@ function renderElement(el, config) {
         "id": () => elId,
         "style": () => fullStyle,
         "text": () => textContent,
-        ...(varBinds ? { "data-var-text": (e) => e.varBindings?.varText || '' } : {}),
+        ...(varBinds ? { "data-var-text": (e: any) => e.varBindings?.varText || '' } : {}),
         ...(hidden ? { "data-hidden": "true" } : {})
       }).trim();
     }
@@ -174,10 +185,10 @@ function renderElement(el, config) {
       return json2html.transform([el], {
         "<>": "img",
         "id": () => elId,
-        "src": (e) => e.src,
+        "src": (e: any) => e.src,
         "style": () => imgStyle,
         ...(el.fallbackSrc ? { "onerror": `this.src='${el.fallbackSrc}'` } : {}),
-        ...(varBinds ? { "data-var-src": (e) => e.varBindings?.varSrc || '' } : {}),
+        ...(varBinds ? { "data-var-src": (e: any) => e.varBindings?.varSrc || '' } : {}),
         ...(hidden ? { "data-hidden": "true" } : {})
       }).trim();
     }
@@ -209,7 +220,7 @@ function renderElement(el, config) {
         if (el.justify) gStyle.justifyContent = el.justify;
         if (el.padding !== undefined) gStyle.padding = `${el.padding}px`;
       }
-      const children = el.children ? el.children.map(c => renderElement(c, config)).join('\n') : '';
+      const children = el.children ? el.children.map((c: any) => renderElement(c, config)).join('\n') : '';
       return `<div id="${elId}"${audit ? ' ' + audit : ''}${hidden} style="${styleStr(gStyle)}">\n${children}\n</div>`;
     }
 
@@ -232,22 +243,25 @@ function renderElement(el, config) {
   }
 }
 
-// ─── Scene clip ──────────────────────────────────────────────────────
-function renderScene(scene, config, { localStart = false } = {}) {
-  const elements = scene.elements.map(el => renderElement(el, config)).join('\n');
+function renderScene(scene: any, config: VideoConfig, { localStart = false } = {}): string {
+  const elements = (scene.elements || []).map((el: any) => renderElement(el, config)).join('\n');
   const bg = scene.background === null ? '' : (scene.background ? ` style="${styleStr(scene.background)}"` : '');
   const audit = scene.layoutAudit
     ? Object.entries(scene.layoutAudit).map(([k, v]) => ` data-layout-${kebab(k)}="${v}"`).join('')
     : '';
-  const start = localStart ? 0 : scene.start;
-  return `\n<section class="clip" id="clip-${scene.id}" data-start="${start}" data-duration="${scene.duration}" data-track-index="${scene.trackIndex ?? 1}"${bg}${audit} style="z-index: ${scene.zIndex ?? 1}">\n${elements}\n</section>`;
+  const s = scene as any;
+  const start = localStart ? 0 : s.start;
+  const duration = s.duration;
+  const trackIndex = s.trackIndex;
+  const zIndex = s.zIndex;
+  return `\n<section class="clip" id="clip-${scene.id}" data-start="${start}" data-duration="${duration}" data-track-index="${trackIndex ?? 1}"${bg}${audit} style="z-index: ${zIndex ?? 1}">\n${elements}\n</section>`;
 }
 
 // ─── Audio tracks ────────────────────────────────────────────────────
-function buildAudioTracks(config) {
+function buildAudioTracks(config: VideoConfig): string {
   const tracks = config.audioTracks;
   if (!tracks || tracks.length === 0) return '';
-  return tracks.map(t => {
+  return tracks.map((t: any) => {
     const fades = t.fades && t.fades.length > 0
       ? ` data-fades='${attrJSON(JSON.stringify(t.fades))}'`
       : '';
@@ -256,7 +270,7 @@ function buildAudioTracks(config) {
 }
 
 // ─── Timeline ────────────────────────────────────────────────────────
-function timelineDefaults(config) {
+function timelineDefaults(config: VideoConfig): string {
   const defaults = config.animationDefaults || {};
   return JSON.stringify({
     duration: defaults.duration ?? 0.6,
@@ -266,12 +280,12 @@ function timelineDefaults(config) {
   });
 }
 
-function collectAnimLines(elements, sceneStart, lines) {
+function collectAnimLines(elements: any[], sceneStart: number, lines: string[]) {
   for (const el of elements) {
     if (el.animations) {
       for (const anim of el.animations) {
         const target = `#${el.id}`;
-        const overrides = {};
+        const overrides: any = {};
         if (anim.duration) overrides.duration = anim.duration;
         if (anim.ease) overrides.ease = anim.ease;
         if (anim.delay !== undefined) overrides.delay = anim.delay;
@@ -297,18 +311,18 @@ function collectAnimLines(elements, sceneStart, lines) {
   }
 }
 
-function buildBackgroundAnims(config, lines) {
+function buildBackgroundAnims(config: VideoConfig, lines: string[]) {
   const bg = config.background;
   if (!bg || !bg.animations) return;
   for (const anim of bg.animations) {
-    const overrides = {};
+    const overrides: any = {};
     if (anim.duration) overrides.duration = anim.duration;
     if (anim.ease) overrides.ease = anim.ease;
     lines.push(`tl.to("#${bg.id}", ${JSON.stringify({ ...anim.to, ...overrides })}, ${anim.at});`);
   }
 }
 
-function buildTransitionAnims(scenes, lines) {
+function buildTransitionAnims(scenes: any[], lines: string[]) {
   for (let i = 1; i < scenes.length; i++) {
     const scene = scenes[i];
     const prev = scenes[i - 1];
@@ -335,7 +349,7 @@ function buildTransitionAnims(scenes, lines) {
   }
 }
 
-function buildAudioFades(config, lines) {
+function buildAudioFades(config: VideoConfig, lines: string[]) {
   for (const t of config.audioTracks || []) {
     if (!t.fades) continue;
     for (const fade of t.fades) {
@@ -344,7 +358,7 @@ function buildAudioFades(config, lines) {
   }
 }
 
-function buildTimeline(config) {
+function buildTimeline(config: VideoConfig): string {
   const CID = config.compositionId || 'main';
   const lines = [`const tl = gsap.timeline({ paused: true, defaults: ${timelineDefaults(config)} });`];
   buildBackgroundAnims(config, lines);
@@ -356,12 +370,12 @@ function buildTimeline(config) {
 }
 
 // ─── Monolithic document ─────────────────────────────────────────────
-function buildMonolithic(config) {
+function buildMonolithic(config: VideoConfig): string {
   const varsJSON = varsJSONFor(config);
   return [
     buildHead(config, varsJSON),
     buildBackground(config),
-    ...config.scenes.map(s => renderScene(s, config)),
+    ...(config.scenes || []).map(s => renderScene(s, config)),
     buildAudioTracks(config),
     '\n</div>',
     varsJSON ? `\n<script>document.querySelector('[data-composition-id]').setAttribute('data-composition-variables','${attrJSON(varsJSON)}')</script>` : '',
@@ -374,25 +388,26 @@ function buildMonolithic(config) {
 }
 
 // ─── Modular: host document ──────────────────────────────────────────
-function buildModularHost(config, instances, directory) {
+function buildModularHost(config: VideoConfig, instances: any[], directory: string): string {
   const varsJSON = varsJSONFor(config);
-  const sceneById = new Map(config.scenes.map(s => [s.id, s]));
+  const sceneById = new Map((config.scenes || []).map(s => [s.id, s]));
 
   const hosts = instances.map(inst => {
     const scene = sceneById.get(inst.sceneId);
+    if (!scene) return '';
     const src = `${directory}/${inst.sceneId}.html`;
-    return `\n<div id="${inst.sceneId}-host" class="clip" data-composition-id="${inst.sceneId}" data-composition-src="${src}" data-start="${scene.start}" data-duration="${scene.duration}" data-track-index="${scene.trackIndex ?? 1}" style="z-index: ${scene.zIndex ?? 1}"></div>`;
+    const s = scene as any;
+    return `\n<div id="${inst.sceneId}-host" class="clip" data-composition-id="${inst.sceneId}" data-composition-src="${src}" data-start="${s.start}" data-duration="${s.duration}" data-track-index="${s.trackIndex ?? 1}" style="z-index: ${s.zIndex ?? 1}"></div>`;
   }).join('');
 
-  // Scenes without a sub-composition instance stay inline in the host.
-  const inlineScenes = config.scenes
+  const inlineScenes = (config.scenes || [])
     .filter(s => !instances.some(i => i.sceneId === s.id))
     .map(s => renderScene(s, config))
     .join('');
 
   const lines = [`const tl = gsap.timeline({ paused: true, defaults: ${timelineDefaults(config)} });`];
   buildBackgroundAnims(config, lines);
-  for (const scene of config.scenes) {
+  for (const scene of config.scenes || []) {
     if (instances.some(i => i.sceneId === scene.id)) continue;
     collectAnimLines(scene.elements, scene.start, lines);
   }
@@ -416,9 +431,7 @@ function buildModularHost(config, instances, directory) {
 }
 
 // ─── Modular: sub-composition document ───────────────────────────────
-// Everything (style, markup, script) lives inside <template>: the runtime
-// only clones template content, so anything outside it is dropped.
-function buildSubComposition(config, scene, instance) {
+function buildSubComposition(config: VideoConfig, scene: any, instance: any): string {
   const varsJSON = varsJSONFor(config, instance.variables);
   const W = config.width || 1920;
   const H = config.height || 1080;
@@ -455,7 +468,7 @@ ${timeline.join('\n')}
 }
 
 // ─── Public API ──────────────────────────────────────────────────────
-export function loadConfig(configPath) {
+export function loadConfig(configPath: string): VideoConfig {
   if (!fs.existsSync(configPath)) {
     throw new Error(`Config not found: ${configPath}`);
   }
@@ -464,17 +477,19 @@ export function loadConfig(configPath) {
 
 /**
  * Generate composition files from a config.
- * @returns {{files: string[], config: object}}
  */
-export function generate(config, outputDir) {
-  fs.mkdirSync(outputDir, { recursive: true });
-  const written = [];
+export async function generate(config: VideoConfig, outputDir: string) {
+  // 1. Run beforeGenerate Hook from registered plugins
+  const processedConfig = await globalRegistry.runBeforeGenerate(config);
 
-  if (config.architecture === 'modular') {
-    const sub = config.subCompositions || {};
+  fs.mkdirSync(outputDir, { recursive: true });
+  const written: string[] = [];
+
+  if (processedConfig.architecture === 'modular') {
+    const sub: any = processedConfig.subCompositions || {};
     const directory = sub.directory || 'compositions';
-    const instances = sub.scenes || [];
-    const sceneById = new Map(config.scenes.map(s => [s.id, s]));
+    const instances: any[] = sub.scenes || [];
+    const sceneById = new Map((processedConfig.scenes || []).map(s => [s.id, s]));
 
     for (const inst of instances) {
       if (!sceneById.has(inst.sceneId)) {
@@ -487,24 +502,28 @@ export function generate(config, outputDir) {
     for (const inst of instances) {
       const scene = sceneById.get(inst.sceneId);
       const file = path.join(subDir, `${inst.sceneId}.html`);
-      fs.writeFileSync(file, buildSubComposition(config, scene, inst), 'utf8');
+      fs.writeFileSync(file, buildSubComposition(processedConfig, scene, inst), 'utf8');
       written.push(file);
     }
 
     const hostFile = path.join(outputDir, 'index.html');
-    fs.writeFileSync(hostFile, buildModularHost(config, instances, directory), 'utf8');
+    fs.writeFileSync(hostFile, buildModularHost(processedConfig, instances, directory), 'utf8');
     written.unshift(hostFile);
   } else {
     const outFile = path.join(outputDir, 'index.html');
-    fs.writeFileSync(outFile, buildMonolithic(config), 'utf8');
+    fs.writeFileSync(outFile, buildMonolithic(processedConfig), 'utf8');
     written.push(outFile);
   }
 
-  return { files: written, config };
+  // 2. Run afterGenerate Hook from registered plugins
+  const pluginCtx: PluginContext = { config: processedConfig, outputDir };
+  await globalRegistry.runAfterGenerate(pluginCtx);
+
+  return { files: written, config: processedConfig };
 }
 
 /** CLI entry: read config from cwd, write into <cwd>/output. */
-export async function runGenerate(configArg, { outputDir } = {}) {
+export async function runGenerate(configArg: string, { outputDir }: { outputDir?: string } = {}) {
   const cwd = process.cwd();
   const configPath = path.resolve(cwd, configArg);
 
@@ -514,8 +533,8 @@ export async function runGenerate(configArg, { outputDir } = {}) {
     process.exit(1);
   }
 
-  const config = loadConfig(configPath);
-  const errors = validateConfig(config);
+  const rawConfig = loadConfig(configPath);
+  const errors = validateConfig(rawConfig);
   if (errors.length > 0) {
     console.error(`✗ Config validation failed (${errors.length} error${errors.length > 1 ? 's' : ''}):`);
     for (const e of errors.slice(0, 20)) console.error(`  ${e}`);
@@ -523,10 +542,10 @@ export async function runGenerate(configArg, { outputDir } = {}) {
   }
 
   const outDir = path.resolve(cwd, outputDir || 'output');
-  const { files } = generate(config, outDir);
+  const { files, config } = await generate(rawConfig, outDir);
 
   console.log(`✅ Generated ${files.length} file${files.length > 1 ? 's' : ''} (${config.architecture || 'monolithic'}):`);
   for (const f of files) console.log(`   ${path.relative(cwd, f)}`);
-  console.log(`   Scenes: ${config.scenes.length}  Duration: ${config.duration || 'auto'}s  Size: ${config.width || 1920}x${config.height || 1080}`);
+  console.log(`   Scenes: ${(config.scenes || []).length}  Duration: ${config.duration || 'auto'}s  Size: ${config.width || 1920}x${config.height || 1080}`);
   console.log('\nNext: j2hf preview');
 }

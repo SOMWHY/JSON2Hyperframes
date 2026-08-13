@@ -4,6 +4,14 @@
 
 Turn a JSON video config into [HyperFrames](https://hyperframes.heygen.com) HTML compositions and render them to MP4.
 
+## Why this exists?
+
+1. **AI-era Interface (LLM-Friendly)**:
+   Let an LLM generate hundreds of lines of complex Hyperframes HTML + GSAP animations. The hallucination rate is extremely high and difficult to control. But it is much simpler and far more stable for an LLM to generate a schema-compliant `video-config.json` that defines the scenes, text, color palette, and characters. This project is a core building block of the AI video generation pipeline (AIGC Video Pipeline).
+
+2. **Batch Production (Automation)**:
+   For example, a merchant may need to generate 10,000 short videos for 10,000 products, each featuring product images and prices. It is impossible to manually write 10,000 HTML files, but it is easy to render 10,000 JSON files from database data and then use this CLI to generate and render them in batch.
+
 ## CLI Usage
 
 ```bash

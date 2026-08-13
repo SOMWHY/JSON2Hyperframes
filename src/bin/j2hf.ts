@@ -21,12 +21,12 @@ const args = process.argv.slice(2);
 const command = args[0];
 
 // Parse flags
-function getFlag(name) {
+function getFlag(name: string): string | null {
   const flag = args.find(a => a.startsWith(`--${name}=`));
-  return flag ? flag.split('=')[1] : null;
+  return flag ? flag.split('=')[1] || null : null;
 }
 
-function hasFlag(name) {
+function hasFlag(name: string): boolean {
   return args.includes(`--${name}`);
 }
 
@@ -53,27 +53,27 @@ Examples:
 
   switch (command) {
     case 'init': {
-      const { runInit } = await import('../lib/init.mjs');
+      const { runInit } = await import('../lib/init.js');
       await runInit(args[1]);
       break;
     }
 
     case 'generate': {
-      const { runGenerate } = await import('../lib/generate.mjs');
+      const { runGenerate } = await import('../lib/generate.js');
       const configPath = getFlag('config') || 'video-config.json';
       await runGenerate(configPath);
       break;
     }
 
     case 'preview': {
-      const { runPreview } = await import('../lib/hyperframes.mjs');
+      const { runPreview } = await import('../lib/hyperframes.js');
       await runPreview(hasFlag('force-new'));
       break;
     }
 
     case 'render': {
-      const { runRender } = await import('../lib/hyperframes.mjs');
-      const outputPath = getFlag('output');
+      const { runRender } = await import('../lib/hyperframes.js');
+      const outputPath = getFlag('output') || undefined;
       await runRender(outputPath);
       break;
     }

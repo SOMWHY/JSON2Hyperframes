@@ -13,14 +13,14 @@ const PKG_ROOT = path.resolve(__dirname, '..');
 
 const VALID_NAME = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 
-function nameError(name) {
+function nameError(name: string): string | null {
   if (!name || !name.trim()) return 'Project name cannot be empty.';
   if (!VALID_NAME.test(name)) return 'Use letters, digits, dot, dash or underscore; must start with a letter or digit.';
   if (fs.existsSync(path.resolve(process.cwd(), name))) return `Directory "${name}" already exists.`;
   return null;
 }
 
-async function askProjectName() {
+async function askProjectName(): Promise<string> {
   const rl = readline.createInterface({ input, output });
   try {
     for (;;) {
@@ -34,7 +34,7 @@ async function askProjectName() {
   }
 }
 
-export async function runInit(argName) {
+export async function runInit(argName?: string) {
   let name = argName;
 
   if (name) {
