@@ -1,0 +1,32 @@
+{
+  "compositionId": "main",
+  "width": 1920,
+  "height": 1080,
+  "scenes": [
+    {
+      "id": "s1",
+      "start": "s2 + 1",
+      "duration": 4,
+      "elements": [
+        {
+          "id": "e1",
+          "type": "text",
+          "content": "Circular reference"
+        }
+      ]
+    },
+    {
+      "id": "s2",
+      "start": "s1 + 1",
+      "duration": 4,
+      "elements": [
+        {
+          "id": "e2",
+          "type": "text",
+          "content": "Circular reference"
+        }
+      ]
+    }
+  ],
+  "architecture": "monolithic"
+}

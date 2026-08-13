@@ -1,0 +1,20 @@
+{
+  "compositionId": "main",
+  "width": 1920,
+  "height": 1080,
+  "scenes": [
+    {
+      "duration": 4,
+      "start": 0,
+      "trackIndex": 1,
+      "elements": [
+        {
+          "id": "e1",
+          "type": "text",
+          "content": "Missing scene id"
+        }
+      ]
+    }
+  ],
+  "architecture": "monolithic"
+}

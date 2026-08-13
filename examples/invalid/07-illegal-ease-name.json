@@ -1,0 +1,27 @@
+{
+  "compositionId": "main",
+  "width": 1920,
+  "height": 1080,
+  "scenes": [
+    {
+      "id": "s1",
+      "start": 0,
+      "duration": 4,
+      "elements": [
+        {
+          "id": "e1",
+          "type": "text",
+          "content": "Bad ease",
+          "animations": [
+            {
+              "to": { "opacity": 1 },
+              "ease": "nonexistent-ease",
+              "duration": 0.5
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "architecture": "monolithic"
+}

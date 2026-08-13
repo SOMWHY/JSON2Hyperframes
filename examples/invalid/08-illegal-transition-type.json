@@ -1,0 +1,23 @@
+{
+  "compositionId": "main",
+  "width": 1920,
+  "height": 1080,
+  "scenes": [
+    {
+      "id": "s1",
+      "start": 0,
+      "duration": 4,
+      "transitionIn": {
+        "type": "warp-speed"
+      },
+      "elements": [
+        {
+          "id": "e1",
+          "type": "text",
+          "content": "Bad transition type"
+        }
+      ]
+    }
+  ],
+  "architecture": "monolithic"
+}

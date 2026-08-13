@@ -1,0 +1,499 @@
+{
+  "$schema": "../schemas/video-config.schema.json",
+  "schemaVersion": "1.0",
+  "compositionId": "main",
+  "width": 1920,
+  "height": 1080,
+  "duration": 12,
+  "fps": 30,
+  "title": "Q4 产品发布 — 效率革命",
+  "language": "zh-CN",
+
+  "palette": {
+    "themeRef": "dark-premium",
+    "background": "#0b0f14",
+    "foreground": "#e8eaed",
+    "accent": "#66d9ef",
+    "neutral": ["#1a2233", "#2a3040", "#3d4556", "#5a6380"]
+  },
+
+  "typography": {
+    "headlineFont": "Montserrat",
+    "headlineWeight": "900",
+    "bodyFont": "EB Garamond",
+    "bodyWeight": "400",
+    "monoFont": "JetBrains Mono",
+    "headlineSizeMin": 72,
+    "bodySizeMin": 24,
+    "letterSpacing": -0.02
+  },
+
+  "animationDefaults": {
+    "duration": 0.6,
+    "ease": "power3.out",
+    "overwrite": "auto",
+    "immediateRender": true
+  },
+
+  "variables": {
+    "declarations": [
+      {
+        "id": "title",
+        "type": "string",
+        "label": "主标题",
+        "default": "效率革命",
+        "maxLength": 20
+      },
+      {
+        "id": "accent",
+        "type": "color",
+        "label": "强调色",
+        "default": "#66d9ef"
+      },
+      {
+        "id": "count",
+        "type": "number",
+        "label": "用户数量",
+        "default": 100000,
+        "min": 0,
+        "max": 9999999,
+        "step": 1000
+      },
+      {
+        "id": "showCta",
+        "type": "boolean",
+        "label": "显示 CTA",
+        "default": true
+      }
+    ],
+    "values": {
+      "title": "效率革命",
+      "accent": "#66d9ef",
+      "count": 284000,
+      "showCta": true
+    }
+  },
+
+  "background": {
+    "id": "bg-gradient",
+    "style": {
+      "backgroundColor": "#0b0f14"
+    },
+    "animations": [
+      {
+        "to": { "backgroundColor": "#0a1530" },
+        "at": 4,
+        "duration": 3,
+        "ease": "sine.inOut"
+      },
+      {
+        "to": { "backgroundColor": "#0b0f14" },
+        "at": 9,
+        "duration": 3,
+        "ease": "sine.inOut"
+      }
+    ]
+  },
+
+  "scenes": [
+    {
+      "id": "hook",
+      "title": "开场钩子",
+      "start": 0,
+      "duration": 4,
+      "trackIndex": 1,
+      "background": null,
+      "zIndex": 1,
+      "layoutAudit": { "allowOverflow": false, "bleed": false, "ignore": false, "allowCaptionZone": false },
+      "elements": [
+        {
+          "id": "hook-center",
+          "type": "group",
+          "layout": "flex",
+          "direction": "column",
+          "align": "center",
+          "justify": "center",
+          "gap": 12,
+          "style": {
+            "position": "absolute",
+            "top": "40%",
+            "left": 0,
+            "right": 0,
+            "width": "100%",
+            "height": "auto"
+          },
+          "children": [
+            {
+              "id": "hook-title",
+              "type": "text",
+              "content": "{{title}}",
+              "style": {
+                "color": "#e8eaed",
+                "fontSize": 96,
+                "fontWeight": "900",
+                "textAlign": "center",
+                "letterSpacing": "-0.02em",
+                "maxWidth": 1400
+              },
+              "varBindings": {
+                "varText": "title"
+              },
+              "animations": [
+                {
+                  "from": { "opacity": 0, "y": 80, "scale": 0.95 },
+                  "duration": 1.0,
+                  "ease": "power4.out",
+                  "immediateRender": false
+                },
+                {
+                  "to": { "opacity": 0, "y": -60, "scale": 1.05 },
+                  "duration": 0.8,
+                  "ease": "power2.in",
+                  "delay": 2.8
+                }
+              ]
+            },
+            {
+              "id": "hook-subtitle",
+              "type": "text",
+              "content": "Q4 产品发布",
+              "style": {
+                "color": "#66d9ef",
+                "fontSize": 28,
+                "fontWeight": "400",
+                "textAlign": "center",
+                "letterSpacing": "0.15em",
+                "textTransform": "uppercase",
+                "fontFamily": "JetBrains Mono"
+              },
+              "animations": [
+                {
+                  "from": { "opacity": 0, "y": 30 },
+                  "duration": 0.8,
+                  "ease": "power3.out",
+                  "delay": 0.5,
+                  "immediateRender": false
+                },
+                {
+                  "to": { "opacity": 0, "y": -20 },
+                  "duration": 0.6,
+                  "ease": "power2.in",
+                  "delay": 3.0
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "feature",
+      "title": "核心功能展示",
+      "start": 3.8,
+      "duration": 4.5,
+      "trackIndex": 2,
+      "background": null,
+      "zIndex": 2,
+      "transitionIn": {
+        "type": "zoom-through",
+        "preset": "dramatic"
+      },
+      "layoutAudit": { "allowOverflow": false, "bleed": false, "ignore": false, "allowCaptionZone": false },
+      "elements": [
+        {
+          "id": "feature-center",
+          "type": "group",
+          "layout": "flex",
+          "direction": "column",
+          "align": "center",
+          "justify": "center",
+          "gap": 16,
+          "style": {
+            "position": "absolute",
+            "top": "30%",
+            "left": 0,
+            "right": 0,
+            "width": "100%",
+            "height": "auto"
+          },
+          "children": [
+            {
+              "id": "feature-stat",
+              "type": "text",
+              "content": "{{count}}",
+              "style": {
+                "color": "#66d9ef",
+                "fontSize": 120,
+                "fontWeight": "900",
+                "textAlign": "center",
+                "letterSpacing": "-0.03em",
+                "fontVariantNumeric": "tabular-nums"
+              },
+              "varBindings": {
+                "varText": "count"
+              },
+              "animations": [
+                {
+                  "from": { "opacity": 0, "y": 100, "scale": 0.8 },
+                  "duration": 1.2,
+                  "ease": "elastic.out(1, 0.5)",
+                  "immediateRender": false
+                }
+              ]
+            },
+            {
+              "id": "feature-label",
+              "type": "text",
+              "content": "活跃用户已选择我们",
+              "style": {
+                "color": "#e8eaed",
+                "fontSize": 32,
+                "fontWeight": "400",
+                "textAlign": "center",
+                "maxWidth": 800
+              },
+              "animations": [
+                {
+                  "from": { "opacity": 0, "y": 40 },
+                  "duration": 0.8,
+                  "ease": "power3.out",
+                  "delay": 0.5,
+                  "immediateRender": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "feature-list",
+          "type": "group",
+          "layout": "flex",
+          "direction": "column",
+          "gap": 16,
+          "align": "center",
+          "padding": 0,
+          "style": {
+            "position": "absolute",
+            "top": "62%",
+            "left": 0,
+            "right": 0,
+            "width": "100%",
+            "height": "auto"
+          },
+          "children": [
+            {
+              "id": "feature-item-1",
+              "type": "text",
+              "content": "✦ 毫秒级响应速度",
+              "style": {
+                "color": "#aab0c0",
+                "fontSize": 22,
+                "textAlign": "center"
+              },
+              "animations": [
+                {
+                  "from": { "opacity": 0, "x": -40 },
+                  "duration": 0.5,
+                  "ease": "power3.out",
+                  "immediateRender": false
+                }
+              ]
+            },
+            {
+              "id": "feature-item-2",
+              "type": "text",
+              "content": "✦ 智能工作流引擎",
+              "style": {
+                "color": "#aab0c0",
+                "fontSize": 22,
+                "textAlign": "center"
+              },
+              "animations": [
+                {
+                  "from": { "opacity": 0, "x": -40 },
+                  "duration": 0.5,
+                  "ease": "power3.out",
+                  "immediateRender": false
+                }
+              ]
+            },
+            {
+              "id": "feature-item-3",
+              "type": "text",
+              "content": "✦ 零配置部署",
+              "style": {
+                "color": "#aab0c0",
+                "fontSize": 22,
+                "textAlign": "center"
+              },
+              "animations": [
+                {
+                  "from": { "opacity": 0, "x": -40 },
+                  "duration": 0.5,
+                  "ease": "power3.out",
+                  "immediateRender": false
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cta",
+      "title": "行动号召",
+      "start": 8.1,
+      "duration": 3.9,
+      "trackIndex": 1,
+      "background": null,
+      "zIndex": 3,
+      "transitionIn": {
+        "type": "crossfade",
+        "duration": 0.6,
+        "ease": "sine.inOut"
+      },
+      "layoutAudit": { "allowOverflow": false, "bleed": false, "ignore": false, "allowCaptionZone": false },
+      "elements": [
+        {
+          "id": "cta-center",
+          "type": "group",
+          "layout": "flex",
+          "direction": "column",
+          "align": "center",
+          "justify": "center",
+          "gap": 24,
+          "style": {
+            "position": "absolute",
+            "top": "40%",
+            "left": 0,
+            "right": 0,
+            "width": "100%",
+            "height": "auto"
+          },
+          "children": [
+            {
+              "id": "cta-headline",
+              "type": "text",
+              "content": "立即体验",
+              "style": {
+                "color": "#e8eaed",
+                "fontSize": 80,
+                "fontWeight": "900",
+                "textAlign": "center",
+                "letterSpacing": "-0.02em"
+              },
+              "animations": [
+                {
+                  "from": { "opacity": 0, "y": 60 },
+                  "duration": 0.8,
+                  "ease": "power4.out",
+                  "immediateRender": false
+                }
+              ]
+            },
+            {
+              "id": "cta-button-wrapper",
+              "type": "group",
+              "layout": "flex",
+              "align": "center",
+              "justify": "center",
+              "gap": 0,
+              "style": {
+                "position": "relative"
+              },
+              "children": [
+                {
+                  "id": "cta-button",
+                  "type": "shape",
+                  "kind": "rect",
+                  "backgroundColor": "#66d9ef",
+                  "radius": 8,
+                  "style": {
+                    "width": 280,
+                    "height": 64
+                  },
+                  "animations": [
+                    {
+                      "from": { "opacity": 0, "scale": 0.8 },
+                      "duration": 0.6,
+                      "ease": "back.out(1.7)",
+                      "delay": 0.4,
+                      "immediateRender": false
+                    }
+                  ]
+                },
+                {
+                  "id": "cta-button-text",
+                  "type": "text",
+                  "content": "免费试用 →",
+                  "style": {
+                    "position": "absolute",
+                    "color": "#0b0f14",
+                    "fontSize": 22,
+                    "fontWeight": "700",
+                    "textAlign": "center",
+                    "fontFamily": "Montserrat"
+                  },
+                  "animations": [
+                    {
+                      "from": { "opacity": 0, "y": 10 },
+                      "duration": 0.4,
+                      "ease": "power2.out",
+                      "delay": 0.7,
+                      "immediateRender": false
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+
+  "audioTracks": [
+    {
+      "id": "bgm",
+      "src": "assets/bgm.mp3",
+      "start": 0,
+      "duration": 12,
+      "trackIndex": 10,
+      "volume": 0.6,
+      "fades": [
+        { "at": 10.5, "to": 0, "duration": 1.5, "ease": "power2.in" }
+      ]
+    }
+  ],
+
+  "transitions": {
+    "default": {
+      "type": "crossfade",
+      "preset": "smooth"
+    },
+    "byScene": {
+      "hook": {
+        "type": "zoom-through",
+        "preset": "dramatic"
+      }
+    }
+  },
+
+  "architecture": "monolithic",
+
+  "renderSettings": {
+    "output": "out.mp4",
+    "quality": "high",
+    "fps": 30,
+    "preview": true,
+    "strict": false,
+    "strictVariables": false
+  },
+
+  "storyboard": {
+    "format": "1920x1080",
+    "message": "效率革命 — 重新定义工作方式",
+    "arc": "Hook → Feature → CTA",
+    "audience": "企业决策者、技术团队负责人、效率工具用户"
+  }
+}

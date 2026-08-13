@@ -1,0 +1,36 @@
+{
+  "name": "j2hf",
+  "version": "1.0.0",
+  "description": "JSON2Hyperframes CLI — turn a JSON video config into HyperFrames HTML and MP4.",
+  "main": "bin/j2hf.mjs",
+  "bin": {
+    "j2hf": "./bin/j2hf.mjs"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "templates",
+    "schemas"
+  ],
+  "scripts": {
+    "test": "node validate.js",
+    "prepublishOnly": "npm pack --dry-run"
+  },
+  "keywords": [
+    "hyperframes",
+    "video",
+    "cli",
+    "json",
+    "generator"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "node-json2html": "^3.3.3"
+  }
+}

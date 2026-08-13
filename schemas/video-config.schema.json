@@ -1,0 +1,765 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://json2hyperframes.dev/schemas/video-config.schema.json",
+  "title": "JSON2Hyperframes Video Config",
+  "description": "Input contract for JSON → HyperFrames composition generation. Every concept maps 1:1 to the HyperFrames composition runtime (data-* attributes, class=\"clip\", single paused timeline, tracks, sub-compositions, variables).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["compositionId", "width", "height", "scenes"],
+
+  "$defs": {
+    "duration": {
+      "description": "Duration in seconds. Must be > 0. repeat: -1 is forbidden.",
+      "type": "number",
+      "minimum": 0.01,
+      "default": 0.6
+    },
+    "ease": {
+      "description": "GSAP ease string. Named eases from the house catalog, or raw CSS/GSAP ease curve.",
+      "type": "string",
+      "default": "power3.out",
+      "examples": ["power3.out", "power2.inOut", "sine.inOut", "bounce.out", "steps(5)", "M0,0 C0.25,0.1 0.25,1 1,1"]
+    },
+    "color": {
+      "description": "CSS color value. Hex, rgb(), hsl(), or named color.",
+      "type": "string",
+      "pattern": "^(#[0-9a-fA-F]{3,8}|rgb(a)?\\(|hsl(a)?\\(|[a-zA-Z]+)$"
+    },
+    "fontFamily": {
+      "description": "Font family name. Must be a preset family or an explicit @font-face name.",
+      "type": "string",
+      "examples": ["Montserrat", "EB Garamond", "JetBrains Mono"]
+    },
+    "fontWeight": {
+      "description": "CSS font-weight. Video requires extreme contrast: headline ≥ 700, body ≤ 400.",
+      "type": "string",
+      "pattern": "^(100|200|300|400|500|600|700|800|900|bold|normal|light)$"
+    },
+    "id": {
+      "description": "Globally unique identifier. Must be a non-empty alphanumeric string.",
+      "type": "string",
+      "pattern": "^[a-zA-Z_][a-zA-Z0-9_-]*$",
+      "minLength": 1
+    },
+    "camelCaseStyle": {
+      "description": "CSS style object in camelCase. transform is forbidden (conflicts with GSAP tweens). visibility and display animations are forbidden (HyperFrames manages clip visibility).",
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^(?!transform$|visibility$|display$).*$": {
+          "description": "Any CSS property in camelCase except transform, visibility, display.",
+          "type": ["string", "number"]
+        }
+      }
+    },
+    "layoutAudit": {
+      "description": "HyperFrames layout audit flags for this element.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowOverflow": { "type": "boolean", "default": false },
+        "bleed": { "type": "boolean", "default": false },
+        "ignore": { "type": "boolean", "default": false },
+        "allowCaptionZone": { "type": "boolean", "default": false }
+      }
+    },
+    "varBindings": {
+      "description": "Maps element attributes to declared variables. Keys are data-var-* suffixes.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "varText": { "$ref": "#/$defs/id" },
+        "varSrc": { "$ref": "#/$defs/id" },
+        "varHref": { "$ref": "#/$defs/id" },
+        "varAlt": { "$ref": "#/$defs/id" }
+      }
+    },
+    "animatableProperty": {
+      "description": "Allowed properties for GSAP tweens. Only these may be animated. transform is handled by GSAP x/y/scale/rotation etc.",
+      "type": "string",
+      "enum": [
+        "opacity", "x", "y", "scale", "scaleX", "scaleY", "rotation",
+        "skewX", "skewY", "transformOrigin",
+        "color", "backgroundColor", "borderColor", "borderRadius",
+        "width", "height",
+        "padding", "margin",
+        "--css-var", "volume", "innerText"
+      ]
+    },
+    "tweenAnimation": {
+      "description": "A single GSAP tween targeting an element. Follows the GSAP tween contract: from, to, or fromTo. repeat: -1 is forbidden. Properties are restricted to the animatableProperty allowlist.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "description": "Start state for a from() or fromTo() tween.",
+          "type": "object",
+          "patternProperties": {
+            "^[a-zA-Z-]+$": { "type": ["string", "number"] }
+          }
+        },
+        "to": {
+          "description": "End state for a to() or fromTo() tween.",
+          "type": "object",
+          "patternProperties": {
+            "^[a-zA-Z-]+$": { "type": ["string", "number"] }
+          },
+          "minProperties": 1
+        },
+        "duration": { "$ref": "#/$defs/duration" },
+        "ease": { "$ref": "#/$defs/ease" },
+        "delay": { "type": "number", "minimum": 0 },
+        "repeat": {
+          "description": "Repeat count. -1 is forbidden (infinite loop). Use 0 for no repeat.",
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        },
+        "yoyo": { "type": "boolean", "default": false },
+        "stagger": {
+          "description": "Stagger amount in seconds, or a stagger config object.",
+          "oneOf": [
+            { "type": "number", "minimum": 0 },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "each": { "type": "number", "minimum": 0 },
+                "from": {
+                  "type": "string",
+                  "enum": ["start", "end", "center", "edges", "random"]
+                },
+                "grid": {
+                  "type": "string",
+                  "pattern": "^\\d+x\\d+$",
+                  "description": "Grid dimensions as 'rowsxcols', e.g. '3x4'"
+                },
+                "axis": { "type": "string", "enum": ["x", "y"] }
+              }
+            }
+          ]
+        },
+        "transformOrigin": { "type": "string" },
+        "overwrite": {
+          "description": "GSAP overwrite mode.",
+          "type": ["string", "boolean"],
+          "default": "auto"
+        },
+        "immediateRender": { "type": "boolean", "default": true },
+        "label": { "type": "string", "description": "Timeline label for this tween (referenced by other timelines)." }
+      },
+      "anyOf": [
+        { "required": ["to"] },
+        { "required": ["from"] }
+      ]
+    },
+    "transitionType": {
+      "description": "Scene transition type. Each maps to a CSS-based transition between overlapping scene clips.",
+      "type": "string",
+      "enum": [
+        "crossfade", "blur-crossfade", "focus-pull", "color-dip-black",
+        "push-slide", "vertical-push", "elastic-push", "squeeze",
+        "zoom-through", "zoom-out", "gravity-drop",
+        "circle-iris", "diamond-iris", "diagonal-split", "clock-wipe", "shutter",
+        "staggered-blocks", "horizontal-blinds", "vertical-blends",
+        "light-leak", "overexposure-burn", "film-burn",
+        "glitch", "chromatic-aberration", "ripple", "vhs-tape",
+        "grid-dissolve"
+      ]
+    },
+    "transitionPreset": {
+      "description": "Named transition preset controlling duration and ease.",
+      "type": "string",
+      "enum": ["snappy", "smooth", "gentle", "dramatic", "instant", "luxe"]
+    },
+    "transitionConfig": {
+      "description": "A single transition configuration. Either a preset or explicit duration/ease.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "$ref": "#/$defs/transitionType" },
+        "preset": { "$ref": "#/$defs/transitionPreset" },
+        "duration": { "type": "number", "minimum": 0.05 },
+        "ease": { "$ref": "#/$defs/ease" },
+        "shader": { "type": "string", "description": "Reserved for future WebGL shader transitions. Not implemented in v1." }
+      },
+      "required": ["type"],
+      "dependencies": {
+        "duration": { "not": { "required": ["preset"] } },
+        "ease": { "not": { "required": ["preset"] } }
+      }
+    },
+    "paletteDef": {
+      "description": "Color palette for the composition. Each color is registered as a --{key} CSS custom property.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "background": { "$ref": "#/$defs/color" },
+        "foreground": { "$ref": "#/$defs/color" },
+        "accent": { "$ref": "#/$defs/color" },
+        "neutral": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/color" },
+          "minItems": 1,
+          "maxItems": 8
+        },
+        "themeRef": {
+          "type": "string",
+          "description": "Reference to a house-style preset name. When provided, individual palette keys are optional (fallback to preset)."
+        }
+      },
+      "anyOf": [
+        { "required": ["themeRef"] },
+        { "required": ["background", "foreground", "accent"] }
+      ]
+    },
+    "typographyDef": {
+      "description": "Typography configuration. Headline and body fonts must be cross-family pairs (sans↔serif / sans↔mono / serif↔sans).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "headlineFont": { "$ref": "#/$defs/fontFamily" },
+        "headlineWeight": { "$ref": "#/$defs/fontWeight" },
+        "bodyFont": { "$ref": "#/$defs/fontFamily" },
+        "bodyWeight": { "$ref": "#/$defs/fontWeight" },
+        "monoFont": { "$ref": "#/$defs/fontFamily" },
+        "headlineSizeMin": { "type": "number", "minimum": 30, "default": 60 },
+        "bodySizeMin": { "type": "number", "minimum": 12, "default": 20 },
+        "letterSpacing": { "type": "number", "minimum": -0.1, "maximum": 0.1, "default": -0.03 }
+      },
+      "required": ["headlineFont", "bodyFont"]
+    },
+    "animationDefaultsDef": {
+      "description": "Composition-level GSAP animation defaults. Overridable per tween.",
+      "type": "object",
+      "additionalProperties": false,
+      "additionalProperties": {
+        "type": ["string", "number", "boolean"]
+      },
+      "properties": {
+        "duration": { "$ref": "#/$defs/duration" },
+        "ease": { "$ref": "#/$defs/ease" },
+        "overwrite": { "type": ["string", "boolean"], "default": "auto" },
+        "immediateRender": { "type": "boolean", "default": true }
+      }
+    },
+    "variableDeclaration": {
+      "description": "Declares a typed variable with optional constraints.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "label", "default"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": {
+          "type": "string",
+          "enum": ["string", "color", "number", "boolean", "enum", "image", "file"]
+        },
+        "label": { "type": "string", "minLength": 1 },
+        "default": {},
+        "maxLength": { "type": "integer", "minimum": 1 },
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "step": { "type": "number", "minimum": 0 },
+        "options": {
+          "description": "Enum options for type=enum variables.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["value", "label"],
+            "properties": {
+              "value": { "type": "string" },
+              "label": { "type": "string", "minLength": 1 }
+            }
+          },
+          "minItems": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "enum" } } },
+          "then": { "required": ["options"] }
+        }
+      ]
+    },
+    "variableValue": {
+      "description": "Runtime values for declared variables. Keys must match declared variable ids.",
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-zA-Z_][a-zA-Z0-9_-]*$": {}
+      }
+    },
+    "variablesDef": {
+      "description": "Variable declarations and runtime values.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "declarations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/variableDeclaration" },
+          "minItems": 1
+        },
+        "values": { "$ref": "#/$defs/variableValue" }
+      },
+      "required": ["declarations"]
+    },
+    "backgroundDef": {
+      "description": "Shared background layer visible throughout the entire composition. Not a clip — no data-start/duration/track-index. Scenes are transparent by default to let this show through.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "style": { "$ref": "#/$defs/camelCaseStyle" },
+        "animations": {
+          "description": "Animations that drive background state changes (e.g., color shifts) over the composition timeline.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "to": {
+                "type": "object",
+                "patternProperties": {
+                  "^[a-zA-Z-]+$": { "type": ["string", "number"] }
+                },
+                "minProperties": 1
+              },
+              "at": { "type": "number", "minimum": 0 },
+              "duration": { "$ref": "#/$defs/duration" },
+              "ease": { "$ref": "#/$defs/ease" }
+            },
+            "required": ["to", "at"]
+          }
+        }
+      },
+      "required": ["id"]
+    },
+    "audioTrack": {
+      "description": "An audio track for background music, narration, or sound effects. Must be a separate <audio> element (not attached to a video element).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "src"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "src": { "type": "string", "minLength": 1 },
+        "start": { "type": "number", "minimum": 0, "default": 0 },
+        "duration": { "type": "number", "minimum": 0.01 },
+        "trackIndex": { "type": "integer", "minimum": 0, "default": 10 },
+        "volume": { "type": "number", "minimum": 0, "maximum": 1, "default": 1 },
+        "fades": {
+          "description": "Volume fade events on the timeline (not data-volume, which is static).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["at", "to"],
+            "properties": {
+              "at": { "type": "number", "minimum": 0 },
+              "to": { "type": "number", "minimum": 0, "maximum": 1 },
+              "duration": { "$ref": "#/$defs/duration" },
+              "ease": { "$ref": "#/$defs/ease" }
+            }
+          }
+        }
+      }
+    },
+    "textElement": {
+      "description": "A text element. No <br> tags — use maxWidth for automatic line wrapping.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "content"],
+      "required": ["type", "content", "id"],
+      "properties": {
+        "type": { "const": "text" },
+        "id": { "$ref": "#/$defs/id" },
+        "content": { "type": "string", "minLength": 0 },
+        "style": { "$ref": "#/$defs/camelCaseStyle" },
+        "typography": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "fontFamily": { "$ref": "#/$defs/fontFamily" },
+            "fontWeight": { "$ref": "#/$defs/fontWeight" },
+            "fontSize": { "type": ["number", "string"] },
+            "lineHeight": { "type": ["number", "string"] },
+            "letterSpacing": { "type": ["number", "string"] },
+            "textAlign": { "type": "string", "enum": ["left", "center", "right", "justify"] },
+            "color": { "$ref": "#/$defs/color" },
+            "textTransform": { "type": "string", "enum": ["none", "uppercase", "lowercase", "capitalize"] },
+            "fontVariantNumeric": { "type": "string" },
+            "maxWidth": { "type": ["number", "string"] }
+          }
+        },
+        "textEffect": {
+          "description": "Named text animation preset applied to this element.",
+          "type": "string",
+          "examples": ["typewriter", "fade-in-words", "slide-up-chars", "reveal"]
+        },
+        "layoutAudit": { "$ref": "#/$defs/layoutAudit" },
+        "varBindings": { "$ref": "#/$defs/varBindings" },
+        "animations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/tweenAnimation" }
+        },
+        "hidden": { "type": "boolean", "default": false }
+      }
+    },
+    "imageElement": {
+      "description": "An image element. Supports fit modes and rounded corners.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "src", "id"],
+      "properties": {
+        "type": { "const": "image" },
+        "id": { "$ref": "#/$defs/id" },
+        "src": { "type": "string", "minLength": 1 },
+        "fit": {
+          "type": "string",
+          "enum": ["cover", "contain", "fill"],
+          "default": "cover"
+        },
+        "radius": { "type": "number", "minimum": 0, "default": 0 },
+        "fallbackSrc": {
+          "type": "string",
+          "description": "Required fallback when varSrc binding is used."
+        },
+        "style": { "$ref": "#/$defs/camelCaseStyle" },
+        "layoutAudit": { "$ref": "#/$defs/layoutAudit" },
+        "varBindings": { "$ref": "#/$defs/varBindings" },
+        "animations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/tweenAnimation" }
+        },
+        "hidden": { "type": "boolean", "default": false }
+      }
+    },
+    "shapeElement": {
+      "description": "A decorative shape element. Pulse animations must leave peak clearance (see docs).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "kind", "id"],
+      "properties": {
+        "type": { "const": "shape" },
+        "id": { "$ref": "#/$defs/id" },
+        "kind": {
+          "type": "string",
+          "enum": ["rect", "circle", "ellipse", "line"]
+        },
+        "backgroundColor": { "$ref": "#/$defs/color" },
+        "border": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "width": { "type": "number", "minimum": 0 },
+            "color": { "$ref": "#/$defs/color" },
+            "style": { "type": "string", "enum": ["solid", "dashed", "dotted", "none"] }
+          }
+        },
+        "radius": {
+          "description": "Border radius in px (only for rect/ellipse).",
+          "type": "number", "minimum": 0
+        },
+        "style": { "$ref": "#/$defs/camelCaseStyle" },
+        "layoutAudit": { "$ref": "#/$defs/layoutAudit" },
+        "animations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/tweenAnimation" }
+        },
+        "hidden": { "type": "boolean", "default": false }
+      }
+    },
+    "videoElement": {
+      "description": "A video element. Automatically muted+playsinline. Separate <audio> element needed for same-source audio.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "src", "id"],
+      "properties": {
+        "type": { "const": "video" },
+        "id": { "$ref": "#/$defs/id" },
+        "src": { "type": "string", "minLength": 1 },
+        "mediaStart": { "type": "number", "minimum": 0, "default": 0 },
+        "volume": { "type": "number", "minimum": 0, "maximum": 1, "default": 1 },
+        "hasAudio": { "type": "boolean", "default": false },
+        "crossOrigin": { "type": "string", "enum": ["anonymous", "use-credentials"] },
+        "style": { "$ref": "#/$defs/camelCaseStyle" },
+        "layoutAudit": { "$ref": "#/$defs/layoutAudit" },
+        "animations": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              { "$ref": "#/$defs/tweenAnimation" },
+              {
+                "properties": {
+                  "to": {
+                    "properties": {
+                      "volume": {
+                        "description": "Volume animation is allowed on video elements with hasAudio=true.",
+                        "type": "number", "minimum": 0, "maximum": 1
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "hidden": { "type": "boolean", "default": false }
+      }
+    },
+    "audioElement": {
+      "description": "An inline audio element (for scene-local audio, distinct from root-level audioTracks).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "src", "id"],
+      "properties": {
+        "type": { "const": "audio" },
+        "id": { "$ref": "#/$defs/id" },
+        "src": { "type": "string", "minLength": 1 },
+        "volume": { "type": "number", "minimum": 0, "maximum": 1, "default": 1 },
+        "mediaStart": { "type": "number", "minimum": 0, "default": 0 },
+        "style": { "$ref": "#/$defs/camelCaseStyle" },
+        "animations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/tweenAnimation" }
+        },
+        "hidden": { "type": "boolean", "default": false }
+      }
+    },
+    "groupElement": {
+      "description": "A layout container. The group itself does not participate in animation — animate its children or an internal wrapper.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "children", "id"],
+      "properties": {
+        "type": { "const": "group" },
+        "id": { "$ref": "#/$defs/id" },
+        "layout": {
+          "type": "string",
+          "enum": ["absolute", "flex", "grid"],
+          "default": "absolute"
+        },
+        "direction": {
+          "description": "flex-direction value.",
+          "type": "string",
+          "enum": ["row", "column", "row-reverse", "column-reverse"]
+        },
+        "gap": { "type": "number", "minimum": 0, "default": 0 },
+        "align": {
+          "description": "CSS align-items value.",
+          "type": "string"
+        },
+        "justify": {
+          "description": "CSS justify-content value.",
+          "type": "string"
+        },
+        "padding": { "type": "number", "minimum": 0, "default": 0 },
+        "style": { "$ref": "#/$defs/camelCaseStyle" },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/elementUnion" },
+          "minItems": 1
+        },
+        "layoutAudit": { "$ref": "#/$defs/layoutAudit" },
+        "hidden": { "type": "boolean", "default": false }
+      }
+    },
+    "iconElement": {
+      "description": "An icon element referencing a registry/catalog name or SVG path.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "kind", "id"],
+      "properties": {
+        "type": { "const": "icon" },
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "type": "string", "minLength": 1 },
+        "size": { "type": "number", "minimum": 8, "default": 48 },
+        "color": { "$ref": "#/$defs/color" },
+        "style": { "$ref": "#/$defs/camelCaseStyle" },
+        "layoutAudit": { "$ref": "#/$defs/layoutAudit" },
+        "animations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/tweenAnimation" }
+        },
+        "hidden": { "type": "boolean", "default": false }
+      }
+    },
+    "elementUnion": {
+      "description": "Union of all element types. Discriminated by the 'type' field.",
+      "oneOf": [
+        { "$ref": "#/$defs/textElement" },
+        { "$ref": "#/$defs/imageElement" },
+        { "$ref": "#/$defs/shapeElement" },
+        { "$ref": "#/$defs/videoElement" },
+        { "$ref": "#/$defs/audioElement" },
+        { "$ref": "#/$defs/groupElement" },
+        { "$ref": "#/$defs/iconElement" }
+      ]
+    },
+    "sceneDef": {
+      "description": "A visual scene = a HyperFrames clip (<section class=\"clip\">). Must be a direct child of the composition root. Scene backgrounds are transparent by default to let the shared background layer show through.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "start", "duration", "elements"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "type": "string", "description": "Storyboard-friendly scene title." },
+        "start": {
+          "description": "Absolute start time in seconds, or a relative reference string. Relative: '<prevSceneId>', '<id> + N', '<id> - N'.",
+          "oneOf": [
+            { "type": "number", "minimum": 0 },
+            {
+              "type": "string",
+              "pattern": "^[a-zA-Z_][a-zA-Z0-9_-]*(\\s*[+-]\\s*\\d+(\\.\\d+)?)?$"
+            }
+          ]
+        },
+        "duration": { "type": "number", "minimum": 0.01 },
+        "trackIndex": {
+          "description": "Track index for this clip. Sequential scenes sharing the same track is normal. Track 0 is reserved for the composition root.",
+          "type": "integer",
+          "minimum": 0,
+          "default": 1
+        },
+        "background": {
+          "description": "Scene-specific background. null = transparent (shared background shows through).",
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/camelCaseStyle" }
+          ],
+          "default": null
+        },
+        "zIndex": { "type": "integer", "default": 1 },
+        "transitionIn": { "$ref": "#/$defs/transitionConfig" },
+        "layoutAudit": { "$ref": "#/$defs/layoutAudit" },
+        "elements": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/elementUnion" },
+          "minItems": 1
+        }
+      }
+    },
+    "subCompositionInstance": {
+      "description": "An instance of a sub-composition (modular architecture). Wired into the host via data-composition-src.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sceneId"],
+      "properties": {
+        "sceneId": { "$ref": "#/$defs/id" },
+        "variables": {
+          "type": "object",
+          "description": "Per-instance variable overrides.",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^[a-zA-Z_][a-zA-Z0-9_-]*$": {}
+          }
+        }
+      }
+    },
+    "subCompositionsDef": {
+      "description": "Sub-composition (modular) architecture configuration. Only applies when architecture = 'modular'.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "directory": {
+          "type": "string",
+          "default": "compositions",
+          "description": "Output directory for sub-composition files."
+        },
+        "scenes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/subCompositionInstance" },
+          "minItems": 1
+        }
+      },
+      "required": ["scenes"]
+    },
+    "renderSettingsDef": {
+      "description": "Rendering configuration for the hyperframes CLI.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "output": { "type": "string", "default": "out.mp4" },
+        "quality": { "type": "string", "enum": ["draft", "high"], "default": "high" },
+        "fps": { "type": "integer", "minimum": 1, "maximum": 120 },
+        "preview": { "type": "boolean", "default": false },
+        "strict": { "type": "boolean", "default": false },
+        "strictVariables": { "type": "boolean", "default": false },
+        "variablesFile": { "type": "string" },
+        "batch": { "type": "string", "description": "--batch rows.json file path for batch rendering." }
+      }
+    },
+    "storyboardDef": {
+      "description": "Metadata for automatic STORYBOARD.md generation.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": { "type": "string", "default": "1920x1080" },
+        "message": { "type": "string", "description": "One-sentence core message." },
+        "arc": { "type": "string", "description": "Narrative arc, e.g. 'Hook → Problem → Solution → CTA'." },
+        "audience": { "type": "string", "description": "Target audience description." }
+      }
+    }
+  },
+
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "type": "string", "pattern": "^\\d+\\.\\d+$", "default": "1.0" },
+    "compositionId": { "$ref": "#/$defs/id" },
+    "width": { "type": "integer", "minimum": 1, "default": 1920 },
+    "height": { "type": "integer", "minimum": 1, "default": 1080 },
+    "duration": {
+      "description": "Root composition duration in seconds. Should be >= sum of scene durations (allow trailing silence).",
+      "type": "number", "minimum": 0.01
+    },
+    "fps": { "type": "integer", "minimum": 1, "maximum": 120, "default": 30 },
+    "title": { "type": "string" },
+    "language": { "type": "string", "default": "zh-CN" },
+    "palette": { "$ref": "#/$defs/paletteDef" },
+    "typography": { "$ref": "#/$defs/typographyDef" },
+    "animationDefaults": { "$ref": "#/$defs/animationDefaultsDef" },
+    "variables": { "$ref": "#/$defs/variablesDef" },
+    "background": { "$ref": "#/$defs/backgroundDef" },
+    "scenes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/sceneDef" },
+      "minItems": 1
+    },
+    "audioTracks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/audioTrack" }
+    },
+    "transitions": {
+      "description": "Global and per-scene transition configuration.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default": { "$ref": "#/$defs/transitionConfig" },
+        "byScene": {
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^[a-zA-Z_][a-zA-Z0-9_-]*$": { "$ref": "#/$defs/transitionConfig" }
+          }
+        }
+      }
+    },
+    "architecture": {
+      "description": "Composition architecture. 'monolithic' for single-file, 'modular' for sub-compositions.",
+      "type": "string",
+      "enum": ["monolithic", "modular"],
+      "default": "monolithic"
+    },
+    "subCompositions": { "$ref": "#/$defs/subCompositionsDef" },
+    "renderSettings": { "$ref": "#/$defs/renderSettingsDef" },
+    "storyboard": { "$ref": "#/$defs/storyboardDef" }
+  },
+
+  "allOf": [
+    {
+      "description": "When architecture=modular, subCompositions is required.",
+      "if": { "required": ["architecture"], "properties": { "architecture": { "const": "modular" } } },
+      "then": { "required": ["subCompositions"] }
+    }
+  ]
+}
