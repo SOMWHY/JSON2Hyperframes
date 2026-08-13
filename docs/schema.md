@@ -1,5 +1,7 @@
 # JSON2Hyperframes Schema 文档
 
+[English](schema_en.md) | [简体中文](schema.md)
+
 ## 字段 ↔ HyperFrames 契约映射表
 
 > 本表定义 `video-config.json` 每个字段如何映射到 HyperFrames 组合运行时

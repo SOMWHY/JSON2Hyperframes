@@ -1,5 +1,7 @@
 # JSON2Hyperframes 校验不变量清单
 
+[English](validation_en.md) | [简体中文](validation.md)
+
 > 本清单定义 `scripts/validate.mjs` 需要实现的跨字段校验规则。
 > 每条不变量包含：校验方法、伪代码/算法描述、错误信息格式。
 

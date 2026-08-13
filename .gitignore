@@ -4,5 +4,4 @@ videos
 *.tgz
 .packages
 
-# HyperFrames official docs cache
-@Hyperframes/
+

@@ -1,5 +1,7 @@
 # JSON2Hyperframes
 
+[English](README.md) | [简体中文](README_zh.md)
+
 Turn a JSON video config into [HyperFrames](https://hyperframes.heygen.com) HTML compositions and render them to MP4.
 
 ## CLI Usage
