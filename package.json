@@ -1,11 +1,11 @@
 {
   "name": "j2hf",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "JSON2Hyperframes CLI — turn a JSON video config into HyperFrames HTML and MP4.",
   "main": "dist/generate.js",
   "types": "dist/lib/generate.d.ts",
   "bin": {
-    "j2hf": "./dist/j2hf.js"
+    "j2hf": "dist/j2hf.js"
   },
   "type": "module",
   "engines": {
@@ -14,7 +14,8 @@
   "files": [
     "dist",
     "templates",
-    "schemas"
+    "schemas",
+    "examples"
   ],
   "scripts": {
     "build": "tsup && tsc --emitDeclarationOnly --declaration",

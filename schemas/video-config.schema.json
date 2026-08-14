@@ -751,6 +751,13 @@
       "default": "monolithic"
     },
     "subCompositions": { "$ref": "#/$defs/subCompositionsDef" },
+    "plugins": {
+      "description": "Third-party plugin specifiers. Each entry is an npm package name or a local file path resolved from cwd. Loaded before schema validation so plugins can register custom element types and beforeGenerate hooks.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "default": [],
+      "uniqueItems": true
+    },
     "renderSettings": { "$ref": "#/$defs/renderSettingsDef" },
     "storyboard": { "$ref": "#/$defs/storyboardDef" }
   },

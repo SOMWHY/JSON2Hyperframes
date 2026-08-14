@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { createRequire } from 'module';
 import { VideoConfig, J2hfPlugin, PluginContext } from './types.js';
 import { globalRegistry } from './plugin-system.js';
@@ -36,6 +36,33 @@ const esc = (s: any) => String(s).replace(/"/g, '&quot;').replace(/</g, '&lt;').
 const attrJSON = (json: string) => json.replace(/'/g, '\\u0027');
 
 // ─── Schema validation ───────────────────────────────────────────────
+/**
+ * Walk a config's scenes and collect instancePaths of elements whose type
+ * is served by a registered plugin renderer (custom element types that the
+ * core elementUnion oneOf cannot know about). AJV errors under those paths
+ * are discarded so plugins can own their own element schemas.
+ */
+function collectPluginElementPaths(config: any): Set<string> {
+  const paths = new Set<string>();
+  const walk = (els: any[], base: string) => {
+    for (let i = 0; i < els.length; i++) {
+      const el = els[i];
+      if (!el || typeof el.type !== 'string') continue;
+      const p = `${base}/${i}`;
+      if (globalRegistry.getRenderer(el.type)) paths.add(p);
+      if (Array.isArray(el.children)) walk(el.children, `${p}/children`);
+    }
+  };
+  if (Array.isArray(config?.scenes)) {
+    for (let si = 0; si < config.scenes.length; si++) {
+      if (Array.isArray(config.scenes[si]?.elements)) {
+        walk(config.scenes[si].elements, `/scenes/${si}/elements`);
+      }
+    }
+  }
+  return paths;
+}
+
 export function validateConfig(config: any): string[] {
   const schemaPath = path.join(PKG_ROOT, 'schemas', 'video-config.schema.json');
   if (!fs.existsSync(schemaPath)) return [];
@@ -50,6 +77,17 @@ export function validateConfig(config: any): string[] {
   const ajv = new (Ajv.default || Ajv)({ allErrors: true, strict: false });
   const validate = ajv.compile(schema);
   if (validate(config)) return [];
+
+  // Drop AJV errors that fall under plugin-served element subtrees — those
+  // elements use a plugin-defined schema, not the core elementUnion oneOf.
+  const pluginPaths = collectPluginElementPaths(config);
+  if (pluginPaths.size > 0) {
+    const pp = Array.from(pluginPaths);
+    const surviving = (validate.errors || []).filter((e: any) =>
+      !e.instancePath || !pp.some(base => e.instancePath === base || e.instancePath.startsWith(base + '/'))
+    );
+    return surviving.map((e: any) => `${e.instancePath || '/'} ${e.message}`);
+  }
   return (validate.errors || []).map((e: any) => `${e.instancePath || '/'} ${e.message}`);
 }
 
@@ -522,6 +560,50 @@ export async function generate(config: VideoConfig, outputDir: string) {
   return { files: written, config: processedConfig };
 }
 
+/**
+ * Load and register third-party plugins declared in config.plugins.
+ * Each entry is an npm package name or a local file path (resolved from cwd).
+ * Called from runGenerate after loadConfig, before validateConfig, so that
+ *   · plugin beforeGenerate hooks run before validation-fenced rendering
+ *   · plugin registerElements make custom element types available to the engine
+ */
+async function loadPlugins(config: VideoConfig) {
+  const names = config.plugins;
+  if (!Array.isArray(names) || names.length === 0) return;
+
+  const cwd = process.cwd();
+  for (const name of names) {
+    if (typeof name !== 'string' || !name.trim()) {
+      console.error(`✗ Invalid plugins entry: ${JSON.stringify(name)} (must be a non-empty string)`);
+      process.exit(1);
+    }
+    let mod: any;
+    try {
+      mod = await import(name);
+    } catch {
+      try {
+        // Bare specifier failed — treat as local path (absolute or relative to cwd).
+        // Dynamic import() requires file:// URLs for absolute paths on Windows.
+        mod = await import(pathToFileURL(path.resolve(cwd, name)).href);
+      } catch (e: any) {
+        console.error(`✗ Failed to load plugin: "${name}"`);
+        console.error(`  ${e?.message || e}`);
+        console.error('  Is it installed? Try: npm install <plugin-name>');
+        process.exit(1);
+      }
+    }
+    const plugin = mod?.default || mod;
+    if (!plugin || typeof plugin !== 'object' || !plugin.name) {
+      console.error(`✗ Plugin "${name}" did not export a valid J2hfPlugin (missing .name)`);
+      process.exit(1);
+    }
+    globalRegistry.register(plugin as J2hfPlugin);
+    const hasElements = typeof plugin.registerElements === 'function';
+    const hooks = [plugin.beforeGenerate && 'beforeGenerate', plugin.afterGenerate && 'afterGenerate'].filter(Boolean);
+    console.log(`• Loaded plugin: ${plugin.name}${hasElements ? ' +customElements' : ''}${hooks.length ? ' +' + hooks.join(' +') : ''}`);
+  }
+}
+
 /** CLI entry: read config from cwd, write into <cwd>/output. */
 export async function runGenerate(configArg: string, { outputDir }: { outputDir?: string } = {}) {
   const cwd = process.cwd();
@@ -534,6 +616,7 @@ export async function runGenerate(configArg: string, { outputDir }: { outputDir?
   }
 
   const rawConfig = loadConfig(configPath);
+  await loadPlugins(rawConfig);
   const errors = validateConfig(rawConfig);
   if (errors.length > 0) {
     console.error(`✗ Config validation failed (${errors.length} error${errors.length > 1 ? 's' : ''}):`);

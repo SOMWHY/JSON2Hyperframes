@@ -31,6 +31,13 @@ export interface VideoConfig {
     fps?: number;
     strict?: boolean;
   };
+  /**
+   * Third-party plugin specifiers. Each entry is an npm package name or a
+   * local file path (resolved from cwd). Plugins are loaded by runGenerate
+   * before schema validation, so they can register custom element types and
+   * run beforeGenerate hooks.
+   */
+  plugins?: string[];
   [key: string]: any; // Allow extension fields for custom rendering
 }
 

@@ -63,6 +63,48 @@ Edit `video-config.json` to define scenes, elements, animations, palette, variab
 
 Schema: `schemas/video-config.schema.json`
 
+## Plugins
+
+The core is minimal and render-only — it doesn't do charts, Lottie, 3D, maps, QR codes, or resource subsetting. Those gaps are intentional: they belong to plugins. Third-party developers can extend the engine at three points:
+
+| Hook | When it runs | What it's for |
+|------|-------------|---------------|
+| `beforeGenerate(config)` | After loading config, before validation | Fetch data from an API/database, inject defaults, normalize a half-finished LLM config into schema-compliant shape |
+| `registerElements()` | Right after load | Return a `{ type: renderer }` map to add custom element types. Plugin renderers are checked **before** the built-in 7 (text/image/shape/group/video/audio/icon), so they override or add |
+| `afterGenerate(ctx)` | After files are written | Generate side artifacts (thumbnails, SRT, manifest), compress/inline assets, upload to a CDN or CMS |
+
+A plugin is a plain module (ESM default export or CJS `module.exports`) that satisfies the `J2hfPlugin` interface in `src/lib/types.ts`:
+
+```js
+// my-plugin.mjs
+export default {
+  name: 'my-plugin',
+  beforeGenerate(config) { return config; },        // optional
+  registerElements() {                            // optional
+    return {
+      'chart': { render: (el, scene) => '<div ...></div>' }
+    };
+  },
+  afterGenerate(ctx) { /* ... */ }                 // optional
+};
+```
+
+Activate it by listing its specifier in your `video-config.json` — an npm package name, or a local file path resolved from your project root:
+
+```json
+{
+  "plugins": ["j2hf-chart", "./plugins/my-plugin.mjs"]
+}
+```
+
+Then run `j2hf generate` as usual. The loader fetches and registers each plugin before schema validation, so plugin-registered element types pass validation (their subtree is excluded from the built-in `elementUnion` oneOf check) and `beforeGenerate` hooks fire before rendering.
+
+A working example ships in `examples/plugin-demo.json` + `examples/plugins/j2hf-progress.mjs` — it registers a `progress` element type, renders a track + fill bar, and injects a GSAP tween to animate the fill. Run it with:
+
+```bash
+node dist/j2hf.js generate --config=examples/plugin-demo.json
+```
+
 ## Development (this repo)
 
 ```bash
