@@ -184,24 +184,38 @@ Stagger applies when a tween targets multiple elements (via `stagger` field or w
 
 ## 3. Background Animations
 
-Each scene can have a `background` object with its own `animations` array. These animations use **absolute `at` time** (not relative to sceneStart).
+A scene's `background` field is either `null` (transparent — the shared background layer shows through) or a plain CSS style object (`camelCaseStyle`). It does **not** support `type`, `gradient`, or `animations` — those belong to the **root-level** `background` layer.
 
-### Background structure
+### Scene-level background (`scene.background`)
+
+```jsonc
+{
+  "scenes": [
+    { "id": "hook", "start": 0, "duration": 4, "trackIndex": 1, "background": null },
+    { "id": "feature", "start": "hook", "duration": 4.5, "trackIndex": 2,
+      "background": { "backgroundColor": "#1e293b" } }
+  ]
+}
+```
+
+### Root-level background (`config.background`)
+
+To animate the background over the composition timeline, use the root-level `background` object. It has an `id`, a `style`, and an `animations` array. These animations use **absolute `at` time** (not relative to sceneStart).
 
 ```jsonc
 {
   "background": {
-    "type": "gradient",
-    "gradient": { "from": "#0f172a", "to": "#334155", "angle": 135 },
+    "id": "bg-gradient",
+    "style": { "backgroundColor": "#0f172a" },
     "animations": [
       { "at": 0, "to": { "opacity": 1 }, "duration": 1.0, "ease": "power2.out" },
-      { "at": 2, "to": { "scale": 1.1, "duration": 4, "ease": "sine.inOut" } }
+      { "at": 4, "to": { "backgroundColor": "#0a1530" }, "duration": 3.0, "ease": "sine.inOut" }
     ]
   }
 }
 ```
 
-### Background animation properties
+### Root-level background animation properties
 
 | Property | Type | Notes |
 |----------|------|-------|
@@ -213,22 +227,22 @@ Each scene can have a `background` object with its own `animations` array. These
 The engine's `buildBackgroundAnims` function collects these and generates:
 ```javascript
 tl.to("#bg-layer-0", { opacity: 1, duration: 1.0, ease: "power2.out" }, 0);
-tl.to("#bg-layer-0", { scale: 1.1, duration: 4, ease: "sine.inOut" }, 2);
+tl.to("#bg-layer-0", { backgroundColor: "#0a1530", duration: 3.0, ease: "sine.inOut" }, 4);
 ```
 
-> **Key difference**: Background animations use `at` (absolute time). Element animations use `delay` (relative to sceneStart).
+> **Key difference**: Root-level background animations use `at` (absolute time). Element animations use `delay` (relative to sceneStart). Scene-level `background` is just a static style (or `null` for transparent).
 
 ---
 
 ## 4. Scene Transitions
 
-Transitions smooth the visual handoff between scenes. They are defined at the scene level in the `transition` field.
+Transitions smooth the visual handoff between scenes. They are defined at the scene level in the `transitionIn` field.
 
-### Transition object
+### TransitionIn object
 
 ```jsonc
 {
-  "transition": {
+  "transitionIn": {
     "type": "crossfade",
     "duration": 0.4,
     "ease": "power2.inOut"
@@ -327,7 +341,7 @@ The schema defines named transition presets that bundle `type` + `duration` + `e
 | `instant` | crossfade | 0.1 | power4.out |
 | `luxe` | blur-crossfade | 0.5 | power2.inOut |
 
-Use a preset by setting `"transition": "smooth"` (string form) instead of an object.
+Use a preset by setting `"transitionIn": "smooth"` (string form) instead of an object.
 
 ---
 
@@ -345,8 +359,8 @@ Root-level `audioTracks` can have `fades` for smooth volume transitions.
       "src": "assets/bgm.mp3",
       "volume": 0.7,
       "fades": [
-        { "at": 0, "type": "in", "duration": 0.5 },
-        { "at": 11.5, "type": "out", "duration": 0.5 }
+        { "at": 0,    "to": 0.7, "duration": 0.5, "ease": "sine.inOut" },
+        { "at": 11.5, "to": 0,   "duration": 0.5, "ease": "sine.inOut" }
       ]
     }
   ]
@@ -358,18 +372,19 @@ Root-level `audioTracks` can have `fades` for smooth volume transitions.
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
 | `at` | number | ✅ | Absolute start time (seconds from composition start). |
-| `type` | string | ✅ | `"in"` (fade in from 0) or `"out"` (fade out to 0). |
-| `duration` | number | ✅ | Fade duration in seconds. |
+| `to` | number | ✅ | Target volume (`0`–`1`). Fade-in: typically the track's `volume`; fade-out: `0`. |
+| `duration` | number | optional | Fade duration in seconds. Default `0.4`. |
+| `ease` | string | optional | GSAP ease. Default `power2.inOut`. |
 
 The engine's `buildAudioFades` generates:
 ```javascript
-// fade in
+// fade in (to track volume 0.7)
 tl.fromTo("#aud-bgm", { volume: 0 }, { volume: 0.7, duration: 0.5, ease: "sine.inOut" }, 0);
-// fade out
+// fade out (to 0)
 tl.to("#aud-bgm", { volume: 0, duration: 0.5, ease: "sine.inOut" }, 11.5);
 ```
 
-> Fades use the audio track's `volume` as the target for fade-in. Fade-out always targets `0`.
+> The `to` field is the target volume level. For fade-in, set `to` to the track's `volume` (e.g. `0.7`); for fade-out, set `to` to `0`.
 
 ---
 
@@ -380,40 +395,39 @@ Scenes use `start` either as an absolute number (seconds) or as a reference to a
 ### Absolute start
 
 ```jsonc
-{ "id": "hook", "start": 0, "duration": 4, "track": 1 }
+{ "id": "hook", "start": 0, "duration": 4, "trackIndex": 1 }
 ```
 
 ### Reference start
 
 ```jsonc
-{ "id": "feature", "start": "hook.start + 3.8", "duration": 4.5, "track": 2 }
+{ "id": "feature", "start": "hook + 3.8", "duration": 4.5, "trackIndex": 2 }
 ```
 
-Supported reference forms:
-- `"hook.start"` → resolves to scene `hook`'s start time
-- `"hook.start + 3.8"` → hook's start + 3.8 seconds
-- `"hook.start + hook.duration"` → hook's start + hook's duration (= hook's end)
-- `"hook.end"` → hook's start + hook's duration
+Supported reference forms (the schema accepts `<id>` optionally followed by `± N`):
+- `"hook"` → resolves to scene `hook`'s **end** (= its `start + duration`); the referenced scene's start is not used directly
+- `"hook + 0.5"` → hook's end + 0.5 seconds
+- `"hook - 0.2"` → hook's end − 0.2 seconds
+
+No `.start` / `.end` / `.duration` accessor syntax is supported — write just the scene id (optionally followed by `± N`).
 
 The engine resolves these at generation time, building a dependency graph. **Circular references are an error** (E003).
 
 ### Tracks
 
-Tracks let scenes overlap:
-
 ```jsonc
 {
   "scenes": [
-    { "id": "hook",   "start": 0,                       "duration": 4,   "track": 1 },
-    { "id": "feature","start": "hook.start + 3.8",      "duration": 4.5, "track": 2 },
-    { "id": "cta",    "start": "feature.start + 4.3",   "duration": 3.9, "track": 1 }
+    { "id": "hook",    "start": 0,                 "duration": 4,   "trackIndex": 1 },
+    { "id": "feature", "start": "hook + 3.8",     "duration": 4.5, "trackIndex": 2 },
+    { "id": "cta",     "start": "feature + 4.3",  "duration": 3.9, "trackIndex": 1 }
   ]
 }
 ```
 
-- Scenes on the **same track** must not overlap (E002).
+- Scenes on the **same track** (same `trackIndex`) must not overlap (E002).
 - Scenes on **different tracks** can overlap — the overlap region is where transitions play.
-- `track` is optional (default `1`).
+- `trackIndex` is optional (default `1`).
 
 ---
 
@@ -428,26 +442,28 @@ A complete 3-scene composition with overlapping tracks, transitions, background,
   "duration": 12,
   "animationDefaults": { "duration": 0.6, "ease": "power3.out" },
 
+  "background": {
+    "id": "bg-gradient",
+    "style": { "backgroundColor": "#0f172a" },
+    "animations": [
+      { "at": 0, "to": { "opacity": 1 }, "duration": 0.8, "ease": "power2.out" },
+      { "at": 2, "to": { "scale": 1.1 }, "duration": 4, "ease": "sine.inOut" }
+    ]
+  },
+
   "audioTracks": [
     { "id": "bgm", "src": "assets/bgm.mp3", "volume": 0.7,
       "fades": [
-        { "at": 0, "type": "in", "duration": 0.5 },
-        { "at": 11.5, "type": "out", "duration": 0.5 }
+        { "at": 0,    "to": 0.7, "duration": 0.5, "ease": "sine.inOut" },
+        { "at": 11.5, "to": 0,   "duration": 0.5, "ease": "sine.inOut" }
       ]
     }
   ],
 
   "scenes": [
     {
-      "id": "hook", "start": 0, "duration": 4, "track": 1,
-      "background": {
-        "type": "gradient",
-        "gradient": { "from": "#0f172a", "to": "#334155", "angle": 135 },
-        "animations": [
-          { "at": 0, "to": { "opacity": 1 }, "duration": 0.8, "ease": "power2.out" },
-          { "at": 2, "to": { "scale": 1.1 }, "duration": 4, "ease": "sine.inOut" }
-        ]
-      },
+      "id": "hook", "start": 0, "duration": 4, "trackIndex": 1,
+      "background": null,
       "elements": [
         {
           "type": "text", "id": "hook-title", "content": "Meet the Future",
@@ -460,8 +476,8 @@ A complete 3-scene composition with overlapping tracks, transitions, background,
       ]
     },
     {
-      "id": "feature", "start": "hook.start + 3.8", "duration": 4.5, "track": 2,
-      "transition": { "type": "zoom-through", "duration": 0.5, "ease": "power3.inOut" },
+      "id": "feature", "start": "hook + 3.8", "duration": 4.5, "trackIndex": 2,
+      "transitionIn": { "type": "zoom-through", "duration": 0.5, "ease": "power3.inOut" },
       "elements": [
         {
           "type": "text", "id": "feature-title", "content": "AI-powered",
@@ -473,8 +489,8 @@ A complete 3-scene composition with overlapping tracks, transitions, background,
       ]
     },
     {
-      "id": "cta", "start": "feature.start + 4.3", "duration": 3.9, "track": 1,
-      "transition": { "type": "crossfade", "duration": 0.4 },
+      "id": "cta", "start": "feature + 4.3", "duration": 3.9, "trackIndex": 1,
+      "transitionIn": { "type": "crossfade", "duration": 0.4 },
       "elements": [
         {
           "type": "shape", "id": "cta-bg", "kind": "rect",
@@ -509,8 +525,8 @@ A complete 3-scene composition with overlapping tracks, transitions, background,
 - [ ] `ease` strings are valid GSAP eases (power1-4, back, elastic, sine, expo, etc.)
 - [ ] Background animations use `at` (absolute time), element animations use `delay` (relative)
 - [ ] Transition `type` is one of the 6 implemented types (crossfade, blur-crossfade, zoom-through, zoom-out, push-slide, color-dip-black)
-- [ ] Audio `fades` use `at` (absolute time) + `type` + `duration`
+- [ ] Audio `fades` use `at` (absolute time) + `to` (target volume) + `duration`
 - [ ] Scene start references don't create circular dependencies (E003)
-- [ ] Scenes on the same track don't overlap (E002)
+- [ ] Scenes on the same `trackIndex` don't overlap (E002)
 - [ ] `volume` animation only on elements with `hasAudio: true` (E007)
 - [ ] `animationDefaults` set at config root for consistent timing across the composition

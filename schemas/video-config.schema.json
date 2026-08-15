@@ -233,9 +233,6 @@
       "description": "Composition-level GSAP animation defaults. Overridable per tween.",
       "type": "object",
       "additionalProperties": false,
-      "additionalProperties": {
-        "type": ["string", "number", "boolean"]
-      },
       "properties": {
         "duration": { "$ref": "#/$defs/duration" },
         "ease": { "$ref": "#/$defs/ease" },
@@ -368,7 +365,6 @@
       "description": "A text element. No <br> tags — use maxWidth for automatic line wrapping.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "content"],
       "required": ["type", "content", "id"],
       "properties": {
         "type": { "const": "text" },
